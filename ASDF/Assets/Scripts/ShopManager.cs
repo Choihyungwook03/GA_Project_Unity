@@ -5,31 +5,27 @@ using TMPro;
 public class ShopManager : MonoBehaviour
 {
     [Header("UI References")]
-    public TMP_InputField searchInput;      // 검색창
-    public Transform itemListParent;        // ScrollView Content
-    public GameObject itemPrefab;           // Item Prefab
+    public TMP_InputField searchInput;      
+    public Transform itemListParent;        
+    public GameObject itemPrefab;           
 
     private List<Item> allItems = new List<Item>();
     private List<Item> sortedItems = new List<Item>();
 
     void Start()
     {
-        // 1. Item_00 ~ Item_99 생성
         for (int i = 0; i < 100; i++)
         {
             Item item = new Item($"Item_{i:D2}", Random.Range(1, 10));
             allItems.Add(item);
         }
 
-        // 2. 정렬된 리스트 생성 (Binary Search용)
         sortedItems = new List<Item>(allItems);
         sortedItems.Sort((a, b) => a.itemName.CompareTo(b.itemName));
 
-        // 3. ScrollView에 전체 아이템 표시
         DisplayItems(allItems);
     }
 
-    // Linear Search 버튼 클릭
     public void OnLinearSearch()
     {
         Debug.Log("Linear Search Clicked!");
@@ -46,7 +42,6 @@ public class ShopManager : MonoBehaviour
         DisplayItems(result);
     }
 
-    // Binary Search 버튼 클릭
     public void OnBinarySearch()
     {
         Debug.Log("Binary Search Clicked!");
@@ -64,7 +59,7 @@ public class ShopManager : MonoBehaviour
             if (cmp == 0)
             {
                 result.Add(sortedItems[mid]);
-                // 동일 이름 좌우 탐색
+                
                 int l = mid - 1;
                 while (l >= 0 && sortedItems[l].itemName == keyword) { result.Add(sortedItems[l]); l--; }
                 int r = mid + 1;
@@ -78,7 +73,6 @@ public class ShopManager : MonoBehaviour
         DisplayItems(result);
     }
 
-    // ScrollView에 아이템 표시
     private void DisplayItems(List<Item> items)
     {
         foreach (Transform child in itemListParent)

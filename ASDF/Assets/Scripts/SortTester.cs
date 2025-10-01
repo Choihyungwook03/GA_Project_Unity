@@ -1,16 +1,15 @@
-using System.Diagnostics; // Stopwatch
+using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class SortTester : MonoBehaviour
 {
-    public Text resultText; // UI Text 연결
+    public Text resultText;
 
     private int[] dataOrigin;
 
     void Start()
     {
-        // 실행할 때마다 새로운 랜덤 데이터 1만 개 생성
         dataOrigin = new int[10000];
         System.Random rand = new System.Random();
         for (int i = 0; i < dataOrigin.Length; i++)
@@ -54,8 +53,6 @@ public class SortTester : MonoBehaviour
         sw.Stop();
         resultText.text = $"퀵 정렬: {sw.Elapsed.TotalMilliseconds:F4} ms";
     }
-
-    // ---------------- 정렬 알고리즘 ----------------
 
     void SelectionSort(int[] arr)
     {
