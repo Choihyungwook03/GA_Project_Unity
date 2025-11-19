@@ -7,97 +7,232 @@ public class MazeGenerator : MonoBehaviour
     public static MazeGenerator Instance;
 
     [Header("미로 설정")]
-    public int width = 21;  // 홀수 추천
-    public int height = 21; // 홀수 추천
-    public float cellSize = 1f;
+    public int width = 10;
+    public int height = 10;
     public GameObject cellPrefab;
+    public float cellSize = 2f;
 
-    private MazeCell[,] grid;
+    [Header("시각화 설정")]
+    public bool visualizeGeneration = false;
+    public float visualizationSpeed = 0.05f;
+    public Color visitedColor = Color.cyan;
+    public Color currentColor = Color.yellow;
+    public Color backtrackColor = Color.magenta;
 
-    void Awake() { Instance = this; }
+    [Header("플레이어 설정")]
+    public Transform player;            
+    private Vector3 playerStartPos;      
 
-    void Start() { StartCoroutine(GenerateMazeRoutine()); }
-    void Update() { if (Input.GetKeyDown(KeyCode.Space)) StartCoroutine(GenerateMazeRoutine()); }
+    private MazeCell[,] maze;
+    private Stack<MazeCell> cellStack;
 
-    public MazeCell GetCell(int x, int z)
+    void Awake()
     {
-        if (x < 0 || x >= width || z < 0 || z >= height) return null;
-        return grid[x, z];
+        if (Instance == null)
+            Instance = this;
     }
 
-    IEnumerator GenerateMazeRoutine()
+    void Start()
     {
-        // 기존 셀 제거
-        if (grid != null)
+        if (player != null)
+            playerStartPos = player.position;
+
+        GenerateMaze();
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Q))
         {
-            foreach (var c in grid) if (c != null) Destroy(c.gameObject);
+            RegenerateMaze();
+        }
+    }
+
+    public void RegenerateMaze()
+    {
+        if (player != null)
+        {
+            player.position = playerStartPos;
+
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
         }
 
-        // 생성
-        grid = new MazeCell[width, height];
-        for (int x = 0; x < width; x++)
-            for (int z = 0; z < height; z++)
-            {
-                Vector3 pos = new Vector3(x * cellSize, 0, z * cellSize);
-                MazeCell cell = Instantiate(cellPrefab, pos, Quaternion.identity, transform).GetComponent<MazeCell>();
-                cell.Initialize(x, z);
-                grid[x, z] = cell;
-            }
+        foreach (Transform child in transform)
+            Destroy(child.gameObject);
 
-        yield return null;
+        GenerateMaze();
+    }
 
-        // 미로 재귀 생성
-        GenerateMazeRecursive(1, 1);
+    public void GenerateMaze()
+    {
+        maze = new MazeCell[width, height];
+        cellStack = new Stack<MazeCell>();
 
-        yield return null;
+        CreateCells();
 
-        // 탈출 가능 확인
-        AIPathfinder pathfinder = FindObjectOfType<AIPathfinder>();
-        if (pathfinder != null)
+        if (visualizeGeneration)
+            StartCoroutine(GenerateWithDFSVisualized());
+        else
+            GenerateWithDFS();
+    }
+
+    void GenerateWithDFS()
+    {
+        MazeCell current = maze[0, 0];
+        current.visited = true;
+        cellStack.Push(current);
+
+        while (cellStack.Count > 0)
         {
-            List<MazeCell> path = pathfinder.FindPathBFS(grid[1, 1], grid[width - 2, height - 2]);
-            if (path == null)
+            current = cellStack.Peek();
+            List<MazeCell> unvisitedNeighbors = GetUnvisitedNeighbors(current);
+
+            if (unvisitedNeighbors.Count > 0)
             {
-                Debug.Log("탈출 불가, 다시 생성...");
-                yield return new WaitForSeconds(0.05f);
-                StartCoroutine(GenerateMazeRoutine());
-                yield break;
+                MazeCell next = unvisitedNeighbors[Random.Range(0, unvisitedNeighbors.Count)];
+                RemoveWallBetween(current, next);
+                next.visited = true;
+                cellStack.Push(next);
             }
             else
             {
-                Debug.Log("탈출 가능한 미로 생성 완료!");
+                cellStack.Pop();
             }
         }
     }
 
-    void GenerateMazeRecursive(int x, int z)
+    void CreateCells()
     {
-        grid[x, z].visited = true;
-
-        List<Vector2Int> dirs = new List<Vector2Int> { new(1, 0), new(-1, 0), new(0, 1), new(0, -1) };
-        // 랜덤 섞기
-        for (int i = 0; i < dirs.Count; i++)
+        if (cellPrefab == null)
         {
-            Vector2Int tmp = dirs[i];
-            int r = Random.Range(i, dirs.Count);
-            dirs[i] = dirs[r];
-            dirs[r] = tmp;
+            Debug.Log("셀 프리팹이 없음");
+            return;
         }
 
-        foreach (Vector2Int dir in dirs)
+        for (int x = 0; x < width; x++)
         {
-            int nx = x + dir.x * 2;
-            int nz = z + dir.y * 2;
-
-            if (nx > 0 && nx < width - 1 && nz > 0 && nz < height - 1 && !grid[nx, nz].visited)
+            for (int z = 0; z < height; z++)
             {
-                MazeCell middle = grid[x + dir.x, z + dir.y];
-                if (dir.x == 1) { grid[x, z].RemoveWall("right"); middle.RemoveWall("left"); }
-                else if (dir.x == -1) { grid[x, z].RemoveWall("left"); middle.RemoveWall("right"); }
-                else if (dir.y == 1) { grid[x, z].RemoveWall("top"); middle.RemoveWall("bottom"); }
-                else if (dir.y == -1) { grid[x, z].RemoveWall("bottom"); middle.RemoveWall("top"); }
+                Vector3 pos = new Vector3(x * cellSize, 0, z * cellSize);
+                GameObject cellObj = Instantiate(cellPrefab, pos, Quaternion.identity, transform);
+                cellObj.name = $"Cell_{x}_{z}";
 
-                GenerateMazeRecursive(nx, nz);
+                MazeCell cell = cellObj.GetComponent<MazeCell>();
+                if (cell == null)
+                {
+                    Debug.LogError("MazeCell 스크립트 없음");
+                    return;
+                }
+
+                cell.Initialize(x, z);
+                maze[x, z] = cell;
+            }
+        }
+    }
+
+    List<MazeCell> GetUnvisitedNeighbors(MazeCell cell)
+    {
+        List<MazeCell> neighbors = new List<MazeCell>();
+
+        if (cell.x > 0 && !maze[cell.x - 1, cell.z].visited)
+            neighbors.Add(maze[cell.x - 1, cell.z]);
+
+        if (cell.x < width - 1 && !maze[cell.x + 1, cell.z].visited)
+            neighbors.Add(maze[cell.x + 1, cell.z]);
+
+        if (cell.z > 0 && !maze[cell.x, cell.z - 1].visited)
+            neighbors.Add(maze[cell.x, cell.z - 1]);
+
+        if (cell.z < height - 1 && !maze[cell.x, cell.z + 1].visited)
+            neighbors.Add(maze[cell.x, cell.z + 1]);
+
+        return neighbors;
+    }
+
+    void RemoveWallBetween(MazeCell current, MazeCell next)
+    {
+        if (current.x < next.x)
+        {
+            current.RemoveWall("right");
+            next.RemoveWall("left");
+        }
+        else if (current.x > next.x)
+        {
+            current.RemoveWall("left");
+            next.RemoveWall("right");
+        }
+        else if (current.z < next.z)
+        {
+            current.RemoveWall("top");
+            next.RemoveWall("bottom");
+        }
+        else if (current.z > next.z)
+        {
+            current.RemoveWall("bottom");
+            next.RemoveWall("top");
+        }
+    }
+
+    public MazeCell GetCell(int x, int z)
+    {
+        if (x >= 0 && x < width && z >= 0 && z < height)
+            return maze[x, z];
+
+        return null;
+    }
+
+    IEnumerator GenerateWithDFSVisualized()
+    {
+        MazeCell current = maze[0, 0];
+        current.visited = true;
+        current.SetColor(currentColor);
+        cellStack.Clear();
+        cellStack.Push(current);
+        yield return new WaitForSeconds(visualizationSpeed);
+
+        while (cellStack.Count > 0)
+        {
+            current = cellStack.Peek();
+            current.SetColor(currentColor);
+            yield return new WaitForSeconds(visualizationSpeed);
+
+            List<MazeCell> unvisitedNeighbors = GetUnvisitedNeighbors(current);
+
+            if (unvisitedNeighbors.Count > 0)
+            {
+                MazeCell next = unvisitedNeighbors[Random.Range(0, unvisitedNeighbors.Count)];
+                RemoveWallBetween(current, next);
+                current.SetColor(visitedColor);
+                next.visited = true;
+                cellStack.Push(next);
+                next.SetColor(currentColor);
+                yield return new WaitForSeconds(visualizationSpeed);
+            }
+            else
+            {
+                current.SetColor(backtrackColor);
+                yield return new WaitForSeconds(visualizationSpeed);
+                current.SetColor(visitedColor);
+                cellStack.Pop();
+            }
+
+            yield return new WaitForSeconds(visualizationSpeed);
+            ResetAllColors();
+        }
+    }
+
+    void ResetAllColors()
+    {
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                maze[x, z].SetColor(Color.white);
             }
         }
     }

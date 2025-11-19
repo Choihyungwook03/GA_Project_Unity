@@ -6,29 +6,28 @@ public class MazeCell : MonoBehaviour
 {
     public GameObject leftWall;
     public GameObject rightWall;
-    public GameObject topWall;
     public GameObject bottomWall;
+    public GameObject topWall;
     public GameObject floor;
 
-    [HideInInspector] public bool visited = false;
-    [HideInInspector] public int x;
-    [HideInInspector] public int z;
+    public bool visited = false;
+    public int x;
+    public int z;
 
-    public void Initialize(int xPos, int zPos)
+    public void Initialize(int xPos, int ZPos)
     {
         x = xPos;
-        z = zPos;
+        z = ZPos;
         visited = false;
         ShowAllWalls();
     }
-
     public void ShowAllWalls()
     {
-        if (leftWall != null) leftWall.SetActive(true);
-        if (rightWall != null) rightWall.SetActive(true);
-        if (topWall != null) topWall.SetActive(true);
-        if (bottomWall != null) bottomWall.SetActive(true);
-        if (floor != null) floor.SetActive(true);
+        leftWall.SetActive(true);
+        rightWall.SetActive(true);
+        bottomWall.SetActive(true);
+        topWall.SetActive(true);
+        floor.SetActive(true);
     }
 
     public void RemoveWall(string direction)
@@ -36,23 +35,21 @@ public class MazeCell : MonoBehaviour
         switch (direction)
         {
             case "left":
-                if (leftWall != null) leftWall.SetActive(false);
+                leftWall.SetActive(false);
                 break;
             case "right":
-                if (rightWall != null) rightWall.SetActive(false);
+                rightWall.SetActive(false);
                 break;
             case "top":
-                if (topWall != null) topWall.SetActive(false);
+                topWall.SetActive(false);
                 break;
             case "bottom":
-                if (bottomWall != null) bottomWall.SetActive(false);
+                bottomWall.SetActive(false);
                 break;
         }
     }
-
     public void SetColor(Color color)
     {
-        if (floor != null)
-            floor.GetComponent<Renderer>().material.color = color;
+        floor.GetComponent<Renderer>().material.color = color;
     }
 }
