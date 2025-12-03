@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5077023629040518579}
   - component: {fileID: 7562123802037343269}
   - component: {fileID: 6403020543374724087}
+  - component: {fileID: -3650458848976946126}
   m_Layer: 0
   m_Name: Prefab_Ground
   m_TagString: Untagged
@@ -105,3 +106,17 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-3650458848976946126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 195232602260120766}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56b139ac0359dc2479ca344c5315f016, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cost: 1
+  pos: {x: 0, y: 0}

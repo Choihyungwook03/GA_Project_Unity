@@ -1,203 +1,102 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class MapManager : MonoBehaviour
 {
-    [Header("Map Settings")]
-    public int width = 21; 
+    public int width = 21;
     public int height = 21;
 
-    [Header("Prefabs")]
-    public GameObject wallPrefab;  
-    public GameObject groundPrefab; 
-    public GameObject forestPrefab; 
-    public GameObject mudPrefab;    
-    public GameObject pathMarker;  
+    public GameObject wallPrefab;
+    public GameObject groundPrefab;
+    public GameObject forestPrefab;
+    public GameObject mudPrefab;
 
-    private Node[,] grid;
-    private List<GameObject> spawnedObjects = new List<GameObject>(); 
+    public GameObject pathMarkerPrefab;
+
+    Tile[,] tiles;
+    int[,] map;
+
+    Vector2Int start;
+    Vector2Int end;
+
+    public AStarPathfinder pathfinder;
+
+    public Transform tileRoot;
+
+    List<GameObject> markers = new List<GameObject>();
 
     void Start()
     {
-        GenerateValidMap();
+        GenerateMap();
     }
 
-    public void OnClickGenerateMap()
+    public void GenerateMap()
     {
-        GenerateValidMap();
-    }
+        if (tileRoot != null)
+            for (int i = tileRoot.childCount - 1; i >= 0; i--)
+                Destroy(tileRoot.GetChild(i).gameObject);
 
-    public void OnClickFindPath()
-    {
-        GameObject[] markers = GameObject.FindGameObjectsWithTag("PathMarker");
-        foreach (var m in markers) Destroy(m);
-
-        Dijkstra(grid[0, 0], grid[width - 1, height - 1]);
-    }
-
-    void GenerateValidMap()
-    {
-        int attempt = 0;
-        while (true)
-        {
-            attempt++;
-            CreateRandomData(); 
-
-            if (DFS_CheckPath(grid[0, 0], grid[width - 1, height - 1]))
-            {
-                Debug.Log($"맵 생성 성공! (시도 횟수: {attempt})");
-                DrawMap();
-                break;
-            }
-        }
-    }
-
-    void CreateRandomData()
-    {
-        grid = new Node[width, height];
+        map = new int[width, height];
+        tiles = new Tile[width, height];
 
         for (int x = 0; x < width; x++)
-        {
             for (int y = 0; y < height; y++)
             {
-                TileType type;
-                int rand = Random.Range(0, 100);
-
-                if (rand < 30) type = TileType.Wall;
-                else if (rand < 60) type = TileType.Ground;
-                else if (rand < 80) type = TileType.Forest;
-                else type = TileType.Mud;
-
-                grid[x, y] = new Node(x, y, type);
+                int r = Random.Range(0, 5);
+                if (r == 0) map[x, y] = 0;        
+                else if (r < 3) map[x, y] = 1;  
+                else if (r == 3) map[x, y] = 2; 
+                else map[x, y] = 3;              
             }
-        }
 
-        grid[0, 0] = new Node(0, 0, TileType.Ground);
-        grid[width - 1, height - 1] = new Node(width - 1, height - 1, TileType.Ground);
-    }
-
-    void DrawMap()
-    {
-        foreach (var obj in spawnedObjects) Destroy(obj);
-        spawnedObjects.Clear();
+        start = new Vector2Int(1, 1);
+        end = new Vector2Int(width - 2, height - 2);
+        map[start.x, start.y] = 1;
+        map[end.x, end.y] = 1;
 
         for (int x = 0; x < width; x++)
-        {
             for (int y = 0; y < height; y++)
             {
-                Vector3 pos = new Vector3(x, 0, y);
-                GameObject prefab = null;
+                GameObject prefab = groundPrefab;
 
-                switch (grid[x, y].type)
-                {
-                    case TileType.Wall: prefab = wallPrefab; pos.y = 1; break; 
-                    case TileType.Ground: prefab = groundPrefab; break;
-                    case TileType.Forest: prefab = forestPrefab; break;
-                    case TileType.Mud: prefab = mudPrefab; break;
-                }
+                if (map[x, y] == 0) prefab = wallPrefab;
+                else if (map[x, y] == 2) prefab = forestPrefab;
+                else if (map[x, y] == 3) prefab = mudPrefab;
 
-                if (prefab != null)
-                {
-                    GameObject go = Instantiate(prefab, pos, Quaternion.identity);
-                    spawnedObjects.Add(go);
-                }
+                Tile t = Instantiate(prefab, new Vector3(x, 0, y), Quaternion.identity, tileRoot).GetComponent<Tile>();
+                t.cost = map[x, y];
+                t.pos = new Vector2Int(x, y);
+                tiles[x, y] = t;
             }
-        }
     }
 
-    bool DFS_CheckPath(Node start, Node target)
+    public void FindPathButton()
     {
-        Stack<Node> stack = new Stack<Node>();
-        HashSet<Node> visited = new HashSet<Node>();
+        ClearMarkers();
 
-        stack.Push(start);
-        visited.Add(start);
+        List<Vector2Int> path = pathfinder.FindPath(map, start, end);
 
-        while (stack.Count > 0)
+        if (path == null)
         {
-            Node current = stack.Pop();
-            if (current == target) return true; 
-
-            foreach (Node neighbor in GetNeighbors(current))
-            {
-                if (!neighbor.isWall && !visited.Contains(neighbor))
-                {
-                    visited.Add(neighbor);
-                    stack.Push(neighbor);
-                }
-            }
-        }
-        return false;
-    }
-
-    void Dijkstra(Node start, Node target)
-    {
-        SimplePriorityQueue<Node> pq = new SimplePriorityQueue<Node>();
-
-        foreach (Node n in grid) n.gCost = int.MaxValue;
-
-        start.gCost = 0;
-        pq.Enqueue(start, 0);
-
-        while (pq.Count > 0)
-        {
-            Node current = pq.Dequeue();
-
-            if (current == target) break;
-
-            foreach (Node neighbor in GetNeighbors(current))
-            {
-                if (neighbor.isWall) continue;
-
-                int newCost = current.gCost + neighbor.cost;
-                if (newCost < neighbor.gCost)
-                {
-                    neighbor.gCost = newCost;
-                    neighbor.parent = current;
-                    pq.Enqueue(neighbor, newCost);
-                }
-            }
-        }
-
-        if (target.parent == null && target != start)
-        {
-            Debug.Log("경로를 찾을 수 없습니다 (오류).");
+            Debug.Log("길 없음");
             return;
         }
 
-        StartCoroutine(VisualizePathRoutine(target));
-    }
-
-    IEnumerator VisualizePathRoutine(Node current)
-    {
-        while (current != null)
+        foreach (var p in path)
         {
-            Vector3 pos = new Vector3(current.x, 1.5f, current.y); 
-            GameObject p = Instantiate(pathMarker, pos, Quaternion.identity);
-            p.tag = "PathMarker"; 
-
-            current = current.parent;
-            yield return new WaitForSeconds(0.05f); 
+            GameObject m = Instantiate(pathMarkerPrefab, new Vector3(p.x, 0.5f, p.y), Quaternion.identity);
+            markers.Add(m);
         }
     }
 
-    List<Node> GetNeighbors(Node node)
+    void ClearMarkers()
     {
-        List<Node> neighbors = new List<Node>();
-        int[] dx = { 0, 0, -1, 1 };
-        int[] dy = { 1, -1, 0, 0 };
-
-        for (int i = 0; i < 4; i++)
-        {
-            int nx = node.x + dx[i];
-            int ny = node.y + dy[i];
-
-            if (nx >= 0 && nx < width && ny >= 0 && ny < height)
-            {
-                neighbors.Add(grid[nx, ny]);
-            }
-        }
-        return neighbors;
+        foreach (var m in markers)
+            Destroy(m);
+        markers.Clear();
     }
+
+    public int[,] GetMap() => map;
+    public Vector2Int GetStart() => start;
+    public Vector2Int GetEnd() => end;
 }
