@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class AStarPathfinder : MonoBehaviour
 {
+    [HideInInspector] public Transform[] enemies;  
+
     public List<Vector2Int> FindPath(int[,] map, Vector2Int start, Vector2Int end)
     {
         int w = map.GetLength(0);
@@ -29,21 +31,21 @@ public class AStarPathfinder : MonoBehaviour
 
         while (open.Count > 0)
         {
-            int best = 0;
-            int bestF = g[open[0].x, open[0].y] + H(open[0], end);
+            int bestIndex = 0;
+            int bestF = g[open[0].x, open[0].y] + Heuristic(open[0], end);
 
             for (int i = 1; i < open.Count; i++)
             {
-                int f = g[open[i].x, open[i].y] + H(open[i], end);
+                int f = g[open[i].x, open[i].y] + Heuristic(open[i], end);
                 if (f < bestF)
                 {
                     bestF = f;
-                    best = i;
+                    bestIndex = i;
                 }
             }
 
-            Vector2Int cur = open[best];
-            open.RemoveAt(best);
+            Vector2Int cur = open[bestIndex];
+            open.RemoveAt(bestIndex);
 
             if (visited[cur.x, cur.y]) continue;
             visited[cur.x, cur.y] = true;
@@ -66,18 +68,14 @@ public class AStarPathfinder : MonoBehaviour
                     g[nx, ny] = newG;
                     parent[nx, ny] = cur;
 
-                    if (!open.Contains(new Vector2Int(nx, ny)))
-                        open.Add(new Vector2Int(nx, ny));
+                    Vector2Int next = new Vector2Int(nx, ny);
+                    if (!open.Contains(next))
+                        open.Add(next);
                 }
             }
         }
 
         return null;
-    }
-
-    int H(Vector2Int a, Vector2Int b)
-    {
-        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     }
 
     int TileCost(int t)
@@ -89,6 +87,26 @@ public class AStarPathfinder : MonoBehaviour
             case 3: return 5;
             default: return 999999;
         }
+    }
+
+    int Heuristic(Vector2Int a, Vector2Int b)
+    {
+        int h = Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+
+        if (enemies != null)
+        {
+            foreach (var e in enemies)
+            {
+                if (e == null) continue;
+                Vector2Int ep = new Vector2Int(Mathf.RoundToInt(e.position.x), Mathf.RoundToInt(e.position.z));
+                int d = Mathf.Abs(ep.x - a.x) + Mathf.Abs(ep.y - a.y);
+
+                if (d < 3)
+                    h += (3 - d) * 5; 
+            }
+        }
+
+        return h;
     }
 
     bool InBounds(int[,] map, int x, int y)
